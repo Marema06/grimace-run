@@ -116,12 +116,11 @@ class FaceMeshController {
     // Sourire : largeur bouche
     this.smileRatio = Math.abs(kps[291].x - kps[61].x) / faceH;
 
-    // Seuils FIXES (pas de calibration)
-    // Calibres pour un visage moyen a 50cm de la camera
-    this.mouthOpen     = this.mouthRatio > 0.05;
-    this.mouthWide     = this.mouthRatio > 0.13;
-    this.eyebrowRaised = this.browRatio  > 0.21;
-    this.smiling       = this.smileRatio > 0.55 && !this.mouthOpen;
+    // Seuils FIXES tres sensibles (regarde la valeur BOUCHE dans le debug HUD)
+    this.mouthOpen     = this.mouthRatio > 0.025;
+    this.mouthWide     = this.mouthRatio > 0.07;
+    this.eyebrowRaised = this.browRatio  > 0.18;
+    this.smiling       = this.smileRatio > 0.50 && !this.mouthOpen;
   }
 
   _drawOverlay() {
@@ -167,9 +166,9 @@ class FaceMeshController {
     ctx.shadowBlur = 0;
 
     // Barres
-    this._drawBar(ctx, 2, 2,  W-4, 11, this.mouthRatio,  0.05, 0.13, '#ffdd00', 'BOUCHE');
-    this._drawBar(ctx, 2, 15, W-4, 11, this.browRatio,   0.21, 0.30, '#ff8800', 'BROW');
-    this._drawBar(ctx, 2, 28, W-4, 11, this.smileRatio,  0.55, 0.70, '#44ff88', 'SMILE');
+    this._drawBar(ctx, 2, 2,  W-4, 11, this.mouthRatio,  0.025, 0.07, '#ffdd00', 'BOUCHE');
+    this._drawBar(ctx, 2, 15, W-4, 11, this.browRatio,   0.18,  0.28, '#ff8800', 'BROW');
+    this._drawBar(ctx, 2, 28, W-4, 11, this.smileRatio,  0.50,  0.65, '#44ff88', 'SMILE');
 
     // Geste detecte
     const labels = [];
