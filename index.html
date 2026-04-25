@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRIMACE RUN — Neural Face Runner</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- Canvas p5.js -->
+  <div id="canvas-container"></div>
+
+  <!-- Panneau latéral -->
+  <div id="ui-panel">
+
+    <div class="title">
+      <h1>GRIMACE<span>RUN</span></h1>
+      <p>NEURAL FACE RUNNER</p>
+    </div>
+
+    <!-- Stats joueur -->
+    <div class="stats-grid">
+      <div class="stat-box yellow">
+        <span class="lbl">SCORE</span>
+        <span class="val" id="stat-score">0</span>
+      </div>
+      <div class="stat-box">
+        <span class="lbl">VIES</span>
+        <span class="val" id="stat-lives">3</span>
+      </div>
+      <div class="stat-box orange wide">
+        <span class="lbl">VITESSE ACTUELLE</span>
+        <span class="val" id="stat-speed">4.2</span>
+      </div>
+    </div>
+
+    <!-- Contrôles faciaux -->
+    <div class="sec">ML5 FACEMESH — GRIMACES</div>
+    <div class="ctrl-legend">
+      <div class="ctrl-row">
+        <span class="ctrl-icon">😮</span>
+        <span class="ctrl-label">Bouche ouverte → SAUT</span>
+        <span class="ctrl-key">ESPACE</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-icon">😱</span>
+        <span class="ctrl-label">Grande bouche → SUPER SAUT</span>
+        <span class="ctrl-key">MAJ</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-icon">🤨</span>
+        <span class="ctrl-label">Sourcils levés → DASH</span>
+        <span class="ctrl-key">↓</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-icon">😄</span>
+        <span class="ctrl-label">Sourire → BOUCLIER</span>
+        <span class="ctrl-key">A</span>
+      </div>
+    </div>
+
+    <button id="btn-facemesh" class="btn-primary" tabindex="-1">ACTIVER VISAGE</button>
+    <div id="face-status">Webcam désactivée</div>
+    <div id="webcam-wrapper">
+      <video id="webcam" autoplay muted playsinline></video>
+      <canvas id="pose-canvas"></canvas>
+      <button id="btn-stop-cam" tabindex="-1" title="Arreter la camera">✕</button>
+    </div>
+
+    <!-- IA neuro-évolutive -->
+    <div class="sec">RUNNERS IA — NEURO-ÉVOLUTION</div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <span class="lbl">GÉNÉRATION</span>
+        <span class="val" id="stat-gen">1</span>
+      </div>
+      <div class="stat-box green">
+        <span class="lbl">EN VIE</span>
+        <span class="val" id="stat-alive">20 / 20</span>
+      </div>
+      <div class="stat-box wide">
+        <span class="lbl">MEILLEUR SCORE IA</span>
+        <span class="val" id="stat-bestai">0</span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="sec">ACTIONS</div>
+    <div class="btn-group">
+      <button id="btn-start"    class="btn-primary"   tabindex="-1">JOUER</button>
+      <button id="btn-reset-ai" class="btn-secondary" tabindex="-1">RESET IA</button>
+    </div>
+
+  </div><!-- /ui-panel -->
+</div><!-- /app -->
+
+<!-- Bibliothèques -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.min.js"></script>
+<script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>
+
+<!-- Jeu -->
+<script src="js/neural-net.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/particles.js"></script>
+<script src="js/facemesh-controller.js"></script>
+<script src="js/player.js"></script>
+<script src="js/obstacles.js"></script>
+<script src="js/ai-population.js"></script>
+<script src="js/sketch.js"></script>
+</body>
+</html>
