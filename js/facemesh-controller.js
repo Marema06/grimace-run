@@ -43,7 +43,11 @@ class FaceMeshController {
       this.statusEl.textContent = 'Connexion webcam...';
 
       this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 320, height: 240, facingMode: 'user' }
+        video: {
+          width:  { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
+        }
       });
 
       this.videoEl.srcObject = this.stream;
