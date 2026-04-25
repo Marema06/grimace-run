@@ -35,7 +35,15 @@ class FaceMeshController {
     this.btn?.addEventListener('click', () => {
       if (!this.active) this._activate();
     });
-    this.btnStop?.addEventListener('click', () => this._deactivate());
+    this.btnStop?.addEventListener('click', () => {
+      this._userStopped = true;
+      this._deactivate();
+    });
+
+    // WATCHDOG : si la camera disparait alors qu'elle devrait etre active,
+    // on la remet en place automatiquement chaque seconde
+    setInterval(() => this._watchdog(), 1000);
+    this._userStopped = false;
   }
 
   async _activate() {
@@ -100,6 +108,28 @@ class FaceMeshController {
         this.statusEl.textContent = 'Camera occupee - ferme Zoom/Teams/Discord';
       else
         this.statusEl.textContent = 'Erreur : ' + (e.message || e.name);
+    }
+  }
+
+  // Verifie chaque seconde que la camera est dans l'etat attendu
+  _watchdog() {
+    // Si l'utilisateur a explicitement arrete : on laisse tranquille
+    if (this._userStopped) return;
+    // Si la camera n'est pas encore active : on ne fait rien (auto-start s'en occupe)
+    if (!this.active) return;
+
+    // Si le wrapper a perdu sa visibilite -> on la remet
+    const wrapper = document.getElementById('webcam-wrapper');
+    if (wrapper && !wrapper.classList.contains('visible')) {
+      wrapper.classList.add('visible');
+    }
+
+    // Si le stream a ete coupe -> on relance tout
+    const tracks = this.stream?.getVideoTracks() || [];
+    if (!tracks.length || tracks[0].readyState !== 'live') {
+      console.warn('[Watchdog] Stream perdu, redemarrage...');
+      this.active = false;
+      this._activate();
     }
   }
 
