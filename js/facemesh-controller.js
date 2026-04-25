@@ -53,13 +53,33 @@ class FaceMeshController {
       this.videoEl.srcObject = this.stream;
       await this.videoEl.play();
 
-      this.overlayEl.width  = this.videoEl.videoWidth  || 320;
-      this.overlayEl.height = this.videoEl.videoHeight || 240;
+      const W = this.videoEl.videoWidth  || 640;
+      const H = this.videoEl.videoHeight || 480;
+
+      this.overlayEl.width  = W;
+      this.overlayEl.height = H;
+
+      // Canvas de pre-traitement : booste luminosite + contraste
+      // pour aider la detection sur peau foncee / faible lumiere
+      this.procCanvas = document.createElement('canvas');
+      this.procCanvas.width  = W;
+      this.procCanvas.height = H;
+      this.procCtx = this.procCanvas.getContext('2d');
+
+      const renderProc = () => {
+        if (!this.active && !this._activating) return;
+        // Boost lumiere : x1.6 + contraste +25%
+        this.procCtx.filter = 'brightness(1.6) contrast(1.25)';
+        try { this.procCtx.drawImage(this.videoEl, 0, 0, W, H); } catch(_) {}
+        requestAnimationFrame(renderProc);
+      };
+      requestAnimationFrame(renderProc);
 
       this.statusEl.textContent = 'Chargement FaceMesh...';
 
       this.facemesh = ml5.faceMesh({ maxFaces: 1, flipped: true });
-      this.facemesh.detectStart(this.videoEl, (results) => {
+      // On passe le canvas BOOSTE a ML5 au lieu du video brut
+      this.facemesh.detectStart(this.procCanvas, (results) => {
         try {
           this.faces = results;
           this._process();
