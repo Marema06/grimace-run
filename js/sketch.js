@@ -282,41 +282,32 @@ function _drawWebcamPIP() {
   text('FACEMESH ML5', px + 4, py + PH - 4);
 }
 
-// ─── Debug FaceMesh (geste detecte, visible quand camera active) ──────────────
+// ─── Debug FaceMesh - valeurs brutes affichees dans le canvas du jeu ─────────
 function _drawFaceDebug() {
   if (!face.active) return;
 
-  const x = CANVAS_W - 210, y = 60;
+  // Position : sous la PIP webcam
+  const x = CANVAS_W - 200, y = 170;
   noStroke(); fill(0, 0, 0, 140);
-  rect(x - 8, y - 14, 210, 68, 5);
+  rect(x - 8, y - 14, 196, 70, 5);
 
-  textFont('monospace'); textSize(10); textAlign(LEFT);
+  textFont('monospace'); textSize(9); textAlign(LEFT);
 
-  // Main detectee ?
-  const handOk = face.handDetected;
-  fill(handOk ? color(0, 255, 200) : color(255, 60, 60));
-  text(handOk ? `Main detectee (${face.fingerCount} doigt(s))` : 'Aucune main visible', x, y);
-
-  // Geste en cours
-  let gCol = color(120, 120, 140);
-  if (face.mouthWide)      gCol = color(255, 30, 130);
-  else if (face.mouthOpen) gCol = color(255, 220, 0);
-  else if (face.eyebrowRaised) gCol = color(255, 140, 0);
-  else if (face.smiling)   gCol = color(60, 255, 140);
-  fill(gCol);
-  text(face.gestureLabel || 'Aucun geste', x, y + 18);
+  // Visage detecte ?
+  const ok = face.faces?.length > 0;
+  fill(ok ? color(0, 255, 200) : color(255, 60, 60));
+  text(ok ? 'Visage OK' : 'Aucun visage', x, y);
 
   // Etat de chaque action
-  textSize(9);
   const actions = [
-    { label: 'INDEX -> SAUT',       on: face.mouthOpen && !face.mouthWide, c: [255,220,0] },
-    { label: 'PAUME -> SUPER SAUT', on: face.mouthWide,                    c: [255,30,130] },
-    { label: 'POING -> DASH',       on: face.eyebrowRaised,                c: [255,140,0] },
-    { label: 'PAIX  -> BOUCLIER',   on: face.smiling,                      c: [60,255,140] },
+    { label: 'BOUCHE',   val: face.mouthRatio, on: face.mouthOpen,     c: [255,220,0] },
+    { label: 'GR.BOUCHE',val: face.mouthRatio, on: face.mouthWide,     c: [255,30,130] },
+    { label: 'SOURCILS', val: face.browRatio,  on: face.eyebrowRaised, c: [255,140,0] },
+    { label: 'SOURIRE',  val: face.smileRatio, on: face.smiling,       c: [60,255,140] },
   ];
-  actions.forEach(({ label, on, c }, i) => {
-    fill(on ? color(...c) : color(70, 70, 90));
-    text((on ? '>> ' : '   ') + label, x, y + 36 + i * 11);
+  actions.forEach(({ label, val, on, c }, i) => {
+    fill(on ? color(...c) : color(110, 110, 130));
+    text(`${on ? '>>' : '  '} ${label.padEnd(9)} ${val.toFixed(3)}`, x, y + 14 + i * 11);
   });
 }
 
