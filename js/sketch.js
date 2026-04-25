@@ -96,6 +96,7 @@ function draw() {
 
   _drawHUD();
   _drawFaceDebug();
+  _drawWebcamPIP();
 
   if (gameState === 'GAMEOVER') _drawGameOverScreen();
   _drawControls();
@@ -225,7 +226,63 @@ function _drawHUD() {
   textAlign(LEFT);
 }
 
-// ─── Debug HandPose (geste detecte, visible quand camera active) ──────────────
+// ─── Webcam Picture-in-Picture dessinee DIRECTEMENT dans le canvas du jeu ────
+// Aucune manipulation DOM ne peut la cacher - elle fait partie du jeu
+function _drawWebcamPIP() {
+  if (!face.active || !face.videoEl) return;
+  if (face.videoEl.readyState < 2) return;
+
+  const PW = 140, PH = 105;
+  const px = CANVAS_W - PW - 12;
+  const py = 50;
+
+  // Cadre
+  noStroke(); fill(0, 0, 0, 200);
+  rect(px - 4, py - 4, PW + 8, PH + 8, 5);
+
+  // Video miroire
+  push();
+  translate(px + PW, py);
+  scale(-1, 1);
+  try { image(face.videoEl, 0, 0, PW, PH); } catch (e) {}
+  pop();
+
+  // Bordure couleur selon geste detecte
+  let bc = color(0, 200, 255);
+  if (face.mouthWide)          bc = color(255, 30, 130);
+  else if (face.mouthOpen)     bc = color(255, 220, 0);
+  else if (face.eyebrowRaised) bc = color(255, 140, 0);
+  else if (face.smiling)       bc = color(60, 255, 140);
+  noFill(); stroke(bc); strokeWeight(2);
+  drawingContext.shadowBlur = 8; drawingContext.shadowColor = bc.toString();
+  rect(px - 2, py - 2, PW + 4, PH + 4, 5);
+  drawingContext.shadowBlur = 0;
+
+  // Landmarks superposes (mirroir)
+  if (face.faces?.length && face.videoEl.videoWidth) {
+    const kps = face.faces[0].keypoints;
+    const sx = PW / face.videoEl.videoWidth;
+    const sy = PH / face.videoEl.videoHeight;
+    noStroke(); fill(0, 255, 200, 110);
+    for (const kp of kps) {
+      const x = px + PW - kp.x * sx;
+      const y = py + kp.y * sy;
+      ellipse(x, y, 1.4);
+    }
+    // Points cles bouche en gros
+    fill(bc);
+    for (const i of [13, 14, 61, 291]) {
+      if (!kps[i]) continue;
+      ellipse(px + PW - kps[i].x * sx, py + kps[i].y * sy, 4);
+    }
+  }
+
+  // Label en bas du PIP
+  fill(255); noStroke(); textSize(8); textAlign(LEFT);
+  text('FACEMESH ML5', px + 4, py + PH - 4);
+}
+
+// ─── Debug FaceMesh (geste detecte, visible quand camera active) ──────────────
 function _drawFaceDebug() {
   if (!face.active) return;
 
