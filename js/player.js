@@ -143,6 +143,17 @@ class Player {
     p.translate(this.x, this.y);
     if (dashing) p.rotate(-0.25);
 
+    // SQUISH / STRETCH cartoon
+    // Etire en l'air (vy negatif = monte), aplatit en chute, ecrase a l'atterrissage
+    let scaleX = 1, scaleY = 1;
+    if (this.vy < -3)        { scaleY = 1.15; scaleX = 0.9; }   // saut : etire
+    else if (this.vy > 5)    { scaleY = 1.10; scaleX = 0.95; }  // chute rapide
+    if (this.y >= this.groundY - 1 && Math.abs(this.vy) < 0.5 && this._lastY < this.groundY - 5) {
+      scaleY = 0.7; scaleX = 1.2; // squish a l'atterrissage
+    }
+    this._lastY = this.y;
+    p.scale(scaleX, scaleY);
+
     // Bouclier
     if (this.shielded) {
       p.drawingContext.shadowBlur = 22;

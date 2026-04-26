@@ -23,6 +23,25 @@ let _lastAnnouncedGen = 1;
 let _comboCount = 0;
 let _lastObstacleScore = 0;
 
+// Score popups (+10 qui flotte depuis les obstacles)
+let _scorePopups = [];
+// Confettis pour celebrer (nouvelle generation, record, etc.)
+let _confettis = [];
+// Coeurs flottants quand bouclier
+let _hearts = [];
+// Etincelles derriere le joueur (combo / vitesse)
+let _sparkles = [];
+
+// Screen shake
+let _shakeTimer = 0;
+let _shakeAmount = 0;
+function _shake(amount = 8, duration = 12) {
+  _shakeTimer = duration; _shakeAmount = amount;
+}
+
+// Suivi obstacles passes pour les +10
+let _passedObstacles = new WeakSet();
+
 // Etoiles fixes scintillantes
 let _stars = [];
 // Particules ambiantes (poussiere cyberpunk qui flotte)
@@ -92,6 +111,16 @@ function _initGame() {
 
 // ─── draw ─────────────────────────────────────────────────────────────────────
 function draw() {
+  // SCREEN SHAKE
+  push();
+  if (_shakeTimer > 0) {
+    const sx = (Math.random() - 0.5) * _shakeAmount;
+    const sy = (Math.random() - 0.5) * _shakeAmount;
+    translate(sx, sy);
+    _shakeTimer--;
+    _shakeAmount *= 0.9;
+  }
+
   _drawBackground();
   _drawGround();
 
@@ -108,7 +137,41 @@ function draw() {
       if (player.hit()) {
         audio.hit();
         particles.crash(player.x, player.y - player.H / 2);
+        _shake(10, 16); // SCREEN SHAKE
+        _spawnConfetti(player.x, player.y - 25, 20, [[255,40,80],[255,120,0]]);
+        _comboCount = 0;
       }
+    }
+
+    // Score popups +10 quand un obstacle passe le joueur
+    for (const o of obstacles.obstacles) {
+      if (!o.passed && o.x + o.w < player.x - 5 && o.alive) {
+        o.passed = true;
+        const points = o.type === 'PIT' ? 20 : 10;
+        _scorePopups.push({
+          text: `+${points}`,
+          x: player.x + 50,
+          y: player.y - 60,
+          vy: 1.4, life: 50, scale: 0.5,
+          col: o.type === 'PIT' ? [180,80,255] : (o.type === 'BAR' ? [255,140,0] : [255,80,80]),
+        });
+        _spawnSparkles(player.x + 30, player.y - 30, 6, [255,220,0]);
+      }
+    }
+
+    // Coeurs qui montent quand bouclier actif
+    if (player.shielded && frameCount % 6 === 0) {
+      _hearts.push({
+        x: player.x + (Math.random() - 0.5) * 30,
+        y: player.y - 20,
+        vy: 1.2, life: 50, scale: 0.7 + Math.random() * 0.3,
+      });
+    }
+
+    // Etincelles derriere le joueur quand on va vite
+    if (obstacles.speed > 6 && frameCount % 3 === 0) {
+      _spawnSparkles(player.x - 18, player.y - 20, 1,
+        obstacles.speed > 8 ? [255,80,180] : [0,200,255]);
     }
 
     // Game over
@@ -117,6 +180,8 @@ function draw() {
       _gameOverTimer = 0;
       highScore = Math.max(highScore, player.score);
       audio.death();
+      _shake(15, 25);
+      _spawnConfetti(player.x, player.y - 25, 40, [[255,40,80],[200,20,40]]);
     }
   } else if (gameState === 'INTRO') {
     _introTimer++;
@@ -132,12 +197,15 @@ function draw() {
   if (aiPop.update(obstacles)) {
     audio.playEvolution(aiPop.generation);
     _updateAIStats();
-    // Annonce passage de generation
+    // Annonce passage de generation + CONFETTIS !
     if (aiPop.generation > _lastAnnouncedGen) {
       _lastAnnouncedGen = aiPop.generation;
       _announce(`GENERATION ${aiPop.generation}`, [0, 255, 200]);
+      _spawnConfetti(CANVAS_W / 2, CANVAS_H / 2, 40);
       if (aiPop.generation % 5 === 0) {
         _announce(`L'IA APPREND...`, [180, 100, 255]);
+        _spawnConfetti(CANVAS_W * 0.3, CANVAS_H / 2, 25);
+        _spawnConfetti(CANVAS_W * 0.7, CANVAS_H / 2, 25);
       }
     }
   }
@@ -178,6 +246,112 @@ function draw() {
   _drawControls();
 
   _updateStats();
+  pop(); // fin screen shake
+
+  // Effets fun (par-dessus tout, pas affectes par le shake)
+  _updateAndDrawFunEffects();
+}
+
+// ─── EFFETS FUN : popups, confettis, coeurs, etincelles ──────────────────────
+function _updateAndDrawFunEffects() {
+  // Score popups +10 +20 etc
+  for (let i = _scorePopups.length - 1; i >= 0; i--) {
+    const p = _scorePopups[i];
+    p.y -= p.vy; p.vy *= 0.96; p.life--;
+    if (p.life <= 0) { _scorePopups.splice(i, 1); continue; }
+    const a = Math.min(p.life / 30, 1) * 255;
+    drawingContext.shadowBlur = 8;
+    drawingContext.shadowColor = `rgba(${p.col.join(',')},${a/255})`;
+    fill(p.col[0], p.col[1], p.col[2], a);
+    noStroke(); textAlign(CENTER); textFont('monospace');
+    textSize(16 * p.scale);
+    text(p.text, p.x, p.y);
+    drawingContext.shadowBlur = 0;
+    p.scale = Math.min(p.scale + 0.04, 1);
+  }
+
+  // Confettis colores
+  for (let i = _confettis.length - 1; i >= 0; i--) {
+    const c = _confettis[i];
+    c.x += c.vx; c.y += c.vy; c.vy += 0.18;
+    c.angle += c.spin; c.life--;
+    if (c.life <= 0 || c.y > CANVAS_H + 20) { _confettis.splice(i, 1); continue; }
+    push(); translate(c.x, c.y); rotate(c.angle);
+    fill(c.col[0], c.col[1], c.col[2], Math.min(c.life * 5, 255));
+    noStroke();
+    rect(-c.w/2, -c.h/2, c.w, c.h);
+    pop();
+  }
+
+  // Coeurs qui montent quand bouclier
+  for (let i = _hearts.length - 1; i >= 0; i--) {
+    const h = _hearts[i];
+    h.y -= h.vy; h.x += Math.sin(h.life * 0.1) * 0.4;
+    h.life--;
+    if (h.life <= 0) { _hearts.splice(i, 1); continue; }
+    const a = Math.min(h.life / 40, 1);
+    push(); translate(h.x, h.y); scale(h.scale);
+    fill(255, 80, 130, 255 * a); noStroke();
+    drawingContext.shadowBlur = 8; drawingContext.shadowColor = 'rgba(255,80,130,0.9)';
+    // Forme de coeur
+    ellipse(-3.5, 0, 7, 6);
+    ellipse( 3.5, 0, 7, 6);
+    triangle(-7, 1, 7, 1, 0, 9);
+    drawingContext.shadowBlur = 0;
+    pop();
+  }
+
+  // Etincelles
+  for (let i = _sparkles.length - 1; i >= 0; i--) {
+    const s = _sparkles[i];
+    s.x += s.vx; s.y += s.vy;
+    s.vx *= 0.95; s.vy *= 0.95;
+    s.life--;
+    if (s.life <= 0) { _sparkles.splice(i, 1); continue; }
+    const a = (s.life / s.maxLife) * 255;
+    fill(s.col[0], s.col[1], s.col[2], a); noStroke();
+    drawingContext.shadowBlur = 4;
+    drawingContext.shadowColor = `rgb(${s.col.join(',')})`;
+    // Etoile a 4 branches
+    push(); translate(s.x, s.y); rotate(s.life * 0.1);
+    quad(0, -s.size, s.size*0.3, 0, 0, s.size, -s.size*0.3, 0);
+    quad(-s.size, 0, 0, -s.size*0.3, s.size, 0, 0, s.size*0.3);
+    pop();
+    drawingContext.shadowBlur = 0;
+  }
+}
+
+function _spawnConfetti(x, y, count = 30, palette = null) {
+  const colors = palette || [[0,255,200],[255,210,0],[255,80,180],[60,255,140],[120,180,255]];
+  for (let i = 0; i < count; i++) {
+    _confettis.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: -Math.random() * 9 - 3,
+      w:  3 + Math.random() * 4,
+      h:  6 + Math.random() * 4,
+      angle: Math.random() * Math.PI * 2,
+      spin:  (Math.random() - 0.5) * 0.3,
+      life:  60 + Math.random() * 40,
+      col:   colors[Math.floor(Math.random() * colors.length)],
+    });
+  }
+}
+
+function _spawnSparkles(x, y, count = 5, col = [255,220,0]) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const sp  = 1 + Math.random() * 3;
+    const life = 25 + Math.random() * 20;
+    _sparkles.push({
+      x, y,
+      vx: Math.cos(ang) * sp,
+      vy: Math.sin(ang) * sp,
+      size: 2 + Math.random() * 2,
+      life, maxLife: life,
+      col,
+    });
+  }
 }
 
 // ─── Contrôles FaceMesh → Player ─────────────────────────────────────────────
