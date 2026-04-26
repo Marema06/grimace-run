@@ -114,12 +114,29 @@ class Player {
     const blinking = this.invincibleTimer > 0 && Math.floor(this.invincibleTimer / 6) % 2 === 0;
     if (blinking) return;
 
-    // Trail dash (traînée bleue)
+    // Aura neon autour du joueur (pulsation)
+    const pulse = 1 + Math.sin(p.frameCount * 0.15) * 0.15;
     p.noStroke();
+    p.drawingContext.shadowBlur = 25 * pulse;
+    p.drawingContext.shadowColor = dashing ? 'rgba(255,140,0,0.7)' : 'rgba(0,220,255,0.7)';
+    p.fill(dashing ? p.color(255,140,0,30) : p.color(0,220,255,30));
+    p.ellipse(this.x, this.y - bodyH/2, this.W * 2.4 * pulse, bodyH * 1.8 * pulse);
+    p.drawingContext.shadowBlur = 0;
+
+    // Trail dash (traînée bleue)
     for (let i = 0; i < this.trail.length; i++) {
       const a = (i / this.trail.length) * 100;
       p.fill(0, 180, 255, a);
       p.rect(this.trail[i].x - this.W / 2, this.trail[i].y - bodyH, this.W, bodyH * 0.6, 3);
+    }
+
+    // Poussiere sous les pieds quand au sol
+    if (!dashing && this.y >= this.groundY - 2 && p.frameCount % 4 === 0) {
+      for (let i = 0; i < 2; i++) {
+        const dx = -10 - Math.random() * 20;
+        p.fill(0, 255, 200, 80 - Math.random() * 40);
+        p.circle(this.x + dx, this.y - 2 + Math.random() * 4, 3 + Math.random() * 3);
+      }
     }
 
     p.push();

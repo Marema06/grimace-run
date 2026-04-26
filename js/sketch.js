@@ -8,9 +8,14 @@ const PLAYER_X = 150;
 const AI_CFG = { size: 20, mutationRate: 0.06, mutationStrength: 0.22 };
 
 let player, obstacles, aiPop, face, audio, particles;
-let gameState  = 'PLAYING'; // WAITING | PLAYING | GAMEOVER
+let gameState  = 'PLAYING';
 let highScore  = 0;
 let bgScroll   = 0;
+
+// Etoiles fixes scintillantes
+let _stars = [];
+// Particules ambiantes (poussiere cyberpunk qui flotte)
+let _dustParticles = [];
 
 // Empêche le saut continu si on garde la bouche ouverte
 let _jumpLatch  = false;
@@ -26,6 +31,30 @@ function setup() {
   audio     = new AudioSystem();
   particles = new ParticleSystem();
   face      = new FaceMeshController();
+
+  // Etoiles dans le ciel (fixes)
+  for (let i = 0; i < 80; i++) {
+    _stars.push({
+      x: Math.random() * CANVAS_W,
+      y: Math.random() * (GROUND_Y - 150),
+      s: Math.random() * 1.8 + 0.4,
+      a: Math.random() * 200 + 50,
+      p: Math.random() * Math.PI * 2,
+    });
+  }
+  // Particules de poussiere ambiante
+  for (let i = 0; i < 40; i++) {
+    const palette = [[0,255,200], [255,80,180], [255,210,0], [120,180,255]];
+    _dustParticles.push({
+      x: Math.random() * CANVAS_W,
+      y: Math.random() * GROUND_Y,
+      s: Math.random() * 2.2 + 0.5,
+      a: Math.random() * 80 + 30,
+      spd: Math.random() * 0.4 + 0.1,
+      ph: Math.random() * Math.PI * 2,
+      col: palette[Math.floor(Math.random() * palette.length)],
+    });
+  }
 
   _initGame();
   _setupUI();
@@ -97,6 +126,7 @@ function draw() {
   _drawHUD();
   _drawFaceDebug();
   _drawWebcamPIP();
+  _drawSpeedLines();
 
   if (gameState === 'GAMEOVER') _drawGameOverScreen();
   _drawControls();
@@ -132,31 +162,96 @@ function _applyFaceControls() {
   }
 }
 
-// ─── Fond cyberpunk en parallaxe ──────────────────────────────────────────────
+// ─── Fond cyberpunk multi-couches avec soleil neon ────────────────────────────
 function _drawBackground() {
-  background(8, 8, 18);
+  // Gradient violet -> bleu nuit
+  for (let y = 0; y < GROUND_Y; y += 4) {
+    const t = y / GROUND_Y;
+    const r = 18 + (8 - 18)  * t;
+    const g = 6  + (8 - 6)   * t;
+    const b = 32 + (22 - 32) * t;
+    stroke(r, g, b); strokeWeight(4);
+    line(0, y, CANVAS_W, y);
+  }
+  noStroke();
 
-  // Bâtiments lointains (défilement lent — 12%)
+  // ── Gros soleil neon avec lignes horizontales (synthwave) ───────────────────
+  const SUN_X = CANVAS_W * 0.72, SUN_Y = GROUND_Y - 90, SUN_R = 110;
+  drawingContext.shadowBlur = 50;
+  drawingContext.shadowColor = 'rgba(255,80,180,0.85)';
+  // Disque gradient
+  for (let r = SUN_R; r > 0; r -= 4) {
+    const t = r / SUN_R;
+    fill(255 - 60 * t, 80 + 100 * (1-t), 180 - 50 * t, 230);
+    circle(SUN_X, SUN_Y, r * 2);
+  }
+  drawingContext.shadowBlur = 0;
+  // Bandes horizontales noires sur le soleil
+  fill(8, 6, 22);
+  for (let i = 0; i < 6; i++) {
+    const sy = SUN_Y - SUN_R + 60 + i * 14;
+    rect(SUN_X - SUN_R, sy, SUN_R * 2, 4 + i * 0.5);
+  }
+
+  // ── Etoiles scintillantes ───────────────────────────────────────────────────
+  for (const s of _stars) {
+    const tw = 0.5 + 0.5 * Math.sin(frameCount * 0.05 + s.p);
+    fill(255, 255, 255, s.a * tw);
+    circle(s.x, s.y, s.s);
+  }
+
+  // ── Montagnes lointaines (parallaxe lente 5%) ───────────────────────────────
+  const mOff = bgScroll * 0.05;
+  fill(28, 14, 50);
+  drawingContext.shadowBlur = 14;
+  drawingContext.shadowColor = 'rgba(140,20,200,0.5)';
+  beginShape();
+  vertex(-10, GROUND_Y);
+  for (let i = 0; i <= 16; i++) {
+    const x = (i * 70 - mOff % 70);
+    const h = 60 + Math.sin(i * 1.7) * 30 + Math.cos(i * 0.8) * 25;
+    vertex(x, GROUND_Y - 30 - h);
+  }
+  vertex(CANVAS_W + 10, GROUND_Y);
+  endShape(CLOSE);
+  drawingContext.shadowBlur = 0;
+
+  // ── Bâtiments parallaxe 12% ─────────────────────────────────────────────────
   const BUILDINGS = [
     { ox:0,   w:75, h:130 }, { ox:120, w:55, h:190 }, { ox:210, w:95, h:105 },
     { ox:340, w:65, h:215 }, { ox:450, w:85, h:145 }, { ox:575, w:50, h:230 },
     { ox:665, w:80, h:170 }, { ox:780, w:60, h:195 },
   ];
   const bOff = bgScroll * 0.12;
-  noStroke();
   for (const b of BUILDINGS) {
     const bx = ((b.ox - bOff % CANVAS_W) % CANVAS_W + CANVAS_W) % CANVAS_W;
-    fill(18, 18, 38);
+    // Silhouette
+    fill(14, 10, 32);
     rect(bx, GROUND_Y - b.h - 20, b.w, b.h);
-    // Fenêtres allumées (aléatoire fixe via seed)
-    fill(0, 80, 130, 70);
+    // Bordure néon en haut
+    fill(0, 255, 200, 90);
+    rect(bx, GROUND_Y - b.h - 20, b.w, 2);
+    // Fenêtres animées
     for (let wy = 12; wy < b.h - 12; wy += 22) {
       for (let wx = 8; wx < b.w - 8; wx += 16) {
-        // pseudo-random déterministe pour éviter le scintillement
         const seed = (b.ox + wx * 7 + wy * 13) % 10;
-        if (seed < 6) rect(bx + wx, GROUND_Y - b.h - 20 + wy, 10, 12, 1);
+        if (seed < 6) {
+          // Couleur cyan/magenta selon seed
+          const c = seed < 3 ? [0, 200, 255] : [220, 80, 255];
+          fill(...c, 90 + (seed * 12));
+          rect(bx + wx, GROUND_Y - b.h - 20 + wy, 10, 12, 1);
+        }
       }
     }
+  }
+
+  // ── Particules ambiantes flottantes (cyberpunk dust) ───────────────────────
+  for (const p of _dustParticles) {
+    p.x -= obstacles.speed * p.spd;
+    p.y += Math.sin(frameCount * 0.02 + p.ph) * 0.3;
+    if (p.x < -5) { p.x = CANVAS_W + 5; p.y = Math.random() * GROUND_Y; }
+    fill(p.col[0], p.col[1], p.col[2], p.a);
+    circle(p.x, p.y, p.s);
   }
 }
 
@@ -224,6 +319,25 @@ function _drawHUD() {
   textAlign(RIGHT);
   text(`VITESSE ${obstacles.speed.toFixed(1)}`, CANVAS_W - 10, 27);
   textAlign(LEFT);
+}
+
+// ─── Lignes de vitesse quand on va vite (effet motion blur) ──────────────────
+function _drawSpeedLines() {
+  if (gameState !== 'PLAYING') return;
+  const intensity = (obstacles.speed - 4.2) / 5.3; // 0 a 1
+  if (intensity < 0.15) return;
+
+  noStroke();
+  const count = Math.floor(8 + intensity * 12);
+  for (let i = 0; i < count; i++) {
+    const seed = (i * 137 + frameCount * 3) % 1000;
+    const y = (seed * 7) % CANVAS_H;
+    const len = 30 + (seed % 60);
+    const x = ((seed * 13 + frameCount * obstacles.speed * 4) % (CANVAS_W + len)) - len;
+    const alpha = 60 * intensity;
+    fill(255, 255, 255, alpha);
+    rect(x, y, len, 1.2);
+  }
 }
 
 // ─── Webcam Picture-in-Picture dessinee DIRECTEMENT dans le canvas du jeu ────
