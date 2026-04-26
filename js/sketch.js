@@ -206,11 +206,8 @@ function draw() {
       _spawnConfetti(player.x, player.y - 25, 40, [[255,40,80],[200,20,40]]);
     }
   } else if (gameState === 'INTRO') {
+    // L'intro reste indefiniment jusqu'a ce que l'utilisateur appuie/clique
     _introTimer++;
-    if (_introTimer > 180) {
-      gameState = 'PLAYING';
-      _announce('GO !', [255, 60, 110]);
-    }
   } else if (gameState === 'GAMEOVER') {
     _gameOverTimer++;
   }
@@ -991,15 +988,16 @@ function _drawIntroScreen() {
     text('Clavier : ESPACE / FLECHE BAS / A', CANVAS_W / 2, CANVAS_H / 2 + 92);
   }
 
-  // Compte a rebours dernier 1.5s
-  if (_introTimer > 90) {
-    const remaining = Math.ceil((180 - _introTimer) / 60);
-    if (remaining > 0) {
-      fill(255, 60, 110, 200);
-      textSize(20);
-      drawingContext.shadowBlur = 14;
-      drawingContext.shadowColor = 'rgba(255,60,110,0.9)';
-      text(`Demarrage dans ${remaining}...`, CANVAS_W / 2, CANVAS_H - 60);
+  // Prompt clignotant "Press SPACE to start"
+  if (_introTimer > 60) {
+    const blink = Math.floor(_introTimer / 30) % 2 === 0;
+    if (blink) {
+      const startPulse = 1 + Math.sin(_introTimer * 0.15) * 0.08;
+      fill(255, 60, 110);
+      textSize(22 * startPulse);
+      drawingContext.shadowBlur = 18;
+      drawingContext.shadowColor = 'rgba(255,60,110,1)';
+      text('ESPACE ou CLIC pour COMMENCER', CANVAS_W / 2, CANVAS_H - 50);
       drawingContext.shadowBlur = 0;
     }
   }
@@ -1195,6 +1193,11 @@ function _setupUI() {
 function _handleKey(code, k) {
   if (!audio.initialized) audio.init();
   if (code === 32 || k === ' ') {
+    if (gameState === 'INTRO') {
+      gameState = 'PLAYING';
+      _announce('GO !', [255, 60, 110]);
+      return;
+    }
     if (gameState === 'GAMEOVER') { _initGame(); gameState = 'PLAYING'; return; }
     if (gameState === 'PLAYING' && player.jump(false)) audio.jump();
   }
@@ -1217,5 +1220,10 @@ function keyPressed() {
 
 function mousePressed() {
   if (!audio.initialized) audio.init();
+  if (gameState === 'INTRO') {
+    gameState = 'PLAYING';
+    _announce('GO !', [255, 60, 110]);
+    return;
+  }
   if (gameState === 'GAMEOVER') { _initGame(); gameState = 'PLAYING'; }
 }
