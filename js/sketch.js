@@ -1158,6 +1158,14 @@ function _setupUI() {
     e.currentTarget.blur();
   });
 
+  // Toggle musique
+  document.getElementById('btn-music')?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    if (!audio.initialized) audio.init();
+    const on = audio.toggleMusic();
+    e.currentTarget.textContent = `🎵 MUSIQUE : ${on ? 'ON' : 'OFF'}`;
+  });
+
   // Export du meilleur cerveau en JSON (preuve d'engineering)
   document.getElementById('btn-export-brain')?.addEventListener('click', (e) => {
     e.currentTarget.blur();
