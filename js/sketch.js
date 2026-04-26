@@ -14,6 +14,15 @@ let bgScroll   = 0;
 let _introTimer = 0;
 let _gameOverTimer = 0;
 
+// Annonces flottantes ("Generation 5 !", "Combo x3", etc.)
+let _announcements = [];
+function _announce(text, color = [255, 220, 0]) {
+  _announcements.push({ text, color, life: 120, y: CANVAS_H / 2 - 40 });
+}
+let _lastAnnouncedGen = 1;
+let _comboCount = 0;
+let _lastObstacleScore = 0;
+
 // Etoiles fixes scintillantes
 let _stars = [];
 // Particules ambiantes (poussiere cyberpunk qui flotte)
@@ -111,7 +120,10 @@ function draw() {
     }
   } else if (gameState === 'INTRO') {
     _introTimer++;
-    if (_introTimer > 180) gameState = 'PLAYING'; // 3 secondes
+    if (_introTimer > 180) {
+      gameState = 'PLAYING';
+      _announce('GO !', [255, 60, 110]);
+    }
   } else if (gameState === 'GAMEOVER') {
     _gameOverTimer++;
   }
@@ -120,6 +132,27 @@ function draw() {
   if (aiPop.update(obstacles)) {
     audio.playEvolution(aiPop.generation);
     _updateAIStats();
+    // Annonce passage de generation
+    if (aiPop.generation > _lastAnnouncedGen) {
+      _lastAnnouncedGen = aiPop.generation;
+      _announce(`GENERATION ${aiPop.generation}`, [0, 255, 200]);
+      if (aiPop.generation % 5 === 0) {
+        _announce(`L'IA APPREND...`, [180, 100, 255]);
+      }
+    }
+  }
+
+  // Detection de combos (obstacles passes consecutifs sans collision)
+  if (gameState === 'PLAYING' && obstacles.frame > _lastObstacleScore + 100) {
+    _comboCount++;
+    _lastObstacleScore = obstacles.frame;
+    if (_comboCount >= 3 && _comboCount % 3 === 0) {
+      _announce(`COMBO x${_comboCount}`, [255, 220, 0]);
+    }
+  }
+  if (gameState === 'GAMEOVER' && _comboCount > 0) {
+    _comboCount = 0;
+    _lastObstacleScore = 0;
   }
 
   bgScroll += obstacles.speed;
@@ -135,6 +168,8 @@ function draw() {
   _drawFaceDebug();
   _drawWebcamPIP();
   _drawSpeedLines();
+  _drawMoodRing();
+  _drawAnnouncements();
 
   if (gameState === 'INTRO')    _drawIntroScreen();
   if (gameState === 'GAMEOVER') _drawGameOverScreen();
@@ -327,6 +362,48 @@ function _drawHUD() {
   fill(255, 200, 0); textSize(10);
   textAlign(RIGHT);
   text(`VITESSE ${obstacles.speed.toFixed(1)}`, CANVAS_W - 10, 27);
+  textAlign(LEFT);
+}
+
+// ─── Mood Ring : les bords du jeu reagissent a ton emotion faciale ──────────
+function _drawMoodRing() {
+  if (!face.active) return;
+
+  let col = null;
+  if (face.mouthWide)          col = [255, 30, 130];
+  else if (face.smiling)       col = [60, 255, 140];
+  else if (face.eyebrowRaised) col = [255, 140, 0];
+  else if (face.mouthOpen)     col = [255, 220, 0];
+  if (!col) return;
+
+  // Vignettage colore sur les bords selon l'expression
+  noStroke();
+  for (let i = 0; i < 30; i += 2) {
+    fill(col[0], col[1], col[2], 4);
+    rect(i, i, CANVAS_W - i*2, CANVAS_H - i*2);
+  }
+}
+
+// ─── Annonces flottantes (Generation, Combo) - elements creatifs ─────────────
+function _drawAnnouncements() {
+  if (!_announcements.length) return;
+  textAlign(CENTER); textFont('monospace');
+  for (let i = _announcements.length - 1; i >= 0; i--) {
+    const a = _announcements[i];
+    a.life--;
+    a.y -= 0.7;
+    if (a.life <= 0) { _announcements.splice(i, 1); continue; }
+
+    const alpha = a.life > 30 ? 255 : (a.life / 30) * 255;
+    const scale = a.life > 100 ? (1 + (120 - a.life) * 0.05) : 1.2;
+
+    drawingContext.shadowBlur = 16;
+    drawingContext.shadowColor = `rgba(${a.color.join(',')},${alpha/255})`;
+    fill(a.color[0], a.color[1], a.color[2], alpha);
+    textSize(22 * scale);
+    text(a.text, CANVAS_W / 2, a.y);
+    drawingContext.shadowBlur = 0;
+  }
   textAlign(LEFT);
 }
 

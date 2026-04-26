@@ -161,13 +161,57 @@ class Player {
     // Corps
     p.rect(-this.W / 2, -bodyH, this.W, bodyH * 0.68, 4);
 
-    // Tête
+    // ── Tete qui MIME le visage du joueur en temps reel via FaceMesh ─────────
     p.circle(0, -bodyH - 13, 22);
+
+    const headY     = -bodyH - 13;
+    const faceLive  = typeof face !== 'undefined' && face.active;
+
+    // Sourcils qui se levent en temps reel
+    if (faceLive) {
+      const browLift = face.eyebrowRaised ? -3 : 0;
+      p.stroke(8, 8, 20); p.strokeWeight(2);
+      p.line(-8, headY - 4 + browLift, -3, headY - 5 + browLift);
+      p.line( 3, headY - 5 + browLift,  8, headY - 4 + browLift);
+      p.noStroke();
+    }
 
     // Yeux
     p.fill(8, 8, 20);
-    p.circle(-5, -bodyH - 15, 5);
-    p.circle(5,  -bodyH - 15, 5);
+    const eyeY    = headY - 2;
+    const eyeLift = faceLive && face.eyebrowRaised ? -2 : 0;
+    if (faceLive && face.smiling) {
+      // Yeux plisses (sourire)
+      p.noFill(); p.stroke(8, 8, 20); p.strokeWeight(2);
+      p.arc(-5, eyeY + 1, 6, 5, Math.PI, 0);
+      p.arc( 5, eyeY + 1, 6, 5, Math.PI, 0);
+      p.noStroke(); p.fill(8, 8, 20);
+    } else {
+      p.circle(-5, eyeY + eyeLift, 5);
+      p.circle( 5, eyeY + eyeLift, 5);
+    }
+
+    // Bouche qui mime
+    const mouthY = headY + 5;
+    if (faceLive && face.mouthWide) {
+      // Grande bouche ouverte (super saut) - rouge interieur
+      p.fill(180, 20, 50);
+      p.ellipse(0, mouthY, 10, 10);
+      p.fill(8, 8, 20);
+      p.ellipse(0, mouthY + 1, 7, 7);
+    } else if (faceLive && face.mouthOpen) {
+      // Bouche ouverte (saut)
+      p.fill(80, 10, 25);
+      p.ellipse(0, mouthY, 8, 6);
+    } else if (faceLive && face.smiling) {
+      // Sourire
+      p.noFill(); p.stroke(8, 8, 20); p.strokeWeight(2);
+      p.arc(0, mouthY - 1, 11, 8, 0, Math.PI);
+      p.noStroke();
+    } else {
+      // Bouche neutre (trait simple)
+      p.rect(-3, mouthY, 6, 1.5, 1);
+    }
 
     // Jambes (uniquement quand en course)
     if (!dashing) {
