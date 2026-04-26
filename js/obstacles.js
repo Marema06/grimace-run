@@ -54,43 +54,88 @@ class Obstacle {
 
   draw(p) {
     p.noStroke();
+    const pulse = 1 + Math.sin(p.frameCount * 0.12) * 0.15;
     switch (this.type) {
       case OBS.WALL: {
-        // Mur rouge néon
-        p.drawingContext.shadowBlur = 14;
-        p.drawingContext.shadowColor = 'rgba(255,40,80,0.9)';
-        p.fill(220, 35, 70);
+        // Mur rouge neon avec pulsation
+        p.drawingContext.shadowBlur = 22 * pulse;
+        p.drawingContext.shadowColor = 'rgba(255,40,80,1)';
+        // Base
+        p.fill(180, 25, 55);
         p.rect(this.x, this.groundY - this.h, this.w, this.h, 2);
-        // Rayures d'avertissement
-        p.fill(255, 210, 0, 140);
+        // Surface plus claire
+        p.fill(255, 60, 100);
+        p.rect(this.x + 2, this.groundY - this.h + 2, this.w - 4, this.h - 4, 1);
+        // Rayures d'avertissement animees
+        p.fill(255, 210, 0, 180);
         for (let s = 0; s < 3; s++) {
-          p.rect(this.x + 3, this.groundY - this.h + s * (this.h / 3) + 5, this.w - 6, 6, 2);
+          const yOff = (p.frameCount * 0.5) % 8;
+          p.rect(this.x + 3, this.groundY - this.h + s * (this.h / 3) + 5 + yOff, this.w - 6, 5, 2);
         }
+        // Pic lumineux en haut
+        p.drawingContext.shadowBlur = 14 * pulse;
+        p.drawingContext.shadowColor = 'rgba(255,210,0,0.9)';
+        p.fill(255, 220, 0);
+        p.triangle(
+          this.x + this.w/2 - 4, this.groundY - this.h,
+          this.x + this.w/2 + 4, this.groundY - this.h,
+          this.x + this.w/2,     this.groundY - this.h - 8
+        );
         break;
       }
       case OBS.BAR: {
-        // Barre suspendue orange
-        p.drawingContext.shadowBlur = 14;
-        p.drawingContext.shadowColor = 'rgba(255,140,0,0.9)';
-        p.fill(230, 120, 0);
+        // Barre suspendue orange pulsante
+        p.drawingContext.shadowBlur = 20 * pulse;
+        p.drawingContext.shadowColor = 'rgba(255,140,0,1)';
+        // Corps
+        p.fill(180, 90, 0);
         p.rect(this.x, 0, this.w, this.barH, 0, 0, 4, 4);
-        p.fill(255, 210, 0, 120);
-        for (let s = 0; s < 3; s++) {
-          if (s % 2 === 0) p.rect(this.x + 3, s * (this.barH / 3) + 3, this.w - 6, this.barH / 3 - 6, 2);
+        p.fill(255, 150, 30);
+        p.rect(this.x + 2, 0, this.w - 4, this.barH - 2, 0, 0, 3, 3);
+        // Rayures animees
+        p.fill(255, 220, 0, 160);
+        for (let s = 0; s < 4; s++) {
+          if (s % 2 === 0) {
+            const off = (p.frameCount * 0.3) % 6;
+            p.rect(this.x + 3, s * (this.barH / 4) + off + 3, this.w - 6, this.barH / 5, 2);
+          }
         }
+        // Pointe en bas pulsante
+        p.drawingContext.shadowBlur = 15 * pulse;
+        p.drawingContext.shadowColor = 'rgba(255,220,0,1)';
+        p.fill(255, 220, 0);
+        p.triangle(
+          this.x,            this.barH,
+          this.x + this.w,   this.barH,
+          this.x + this.w/2, this.barH + 10
+        );
         break;
       }
       case OBS.PIT: {
-        // Trou violet — effacer le sol + rebords lumineux
+        // Trou violet
         p.drawingContext.shadowBlur = 0;
-        p.fill(6, 4, 18);
+        p.fill(4, 2, 14);
         p.rect(this.x, this.groundY, this.w, this.canvasH - this.groundY + 10);
-        // Rebords
-        p.drawingContext.shadowBlur = 12;
-        p.drawingContext.shadowColor = 'rgba(140,0,255,0.9)';
-        p.fill(130, 0, 255);
-        p.rect(this.x - 3, this.groundY - 6, 8, 12, 2);
-        p.rect(this.x + this.w - 5, this.groundY - 6, 8, 12, 2);
+        // Lignes neon descendantes a l'interieur (effet profondeur)
+        for (let i = 0; i < 4; i++) {
+          const a = 60 - i * 12;
+          p.fill(140, 0, 255, a);
+          p.rect(this.x + 4 + i * 2, this.groundY + i * 6, this.w - 8 - i * 4, 2);
+        }
+        // Rebords pulsants
+        p.drawingContext.shadowBlur = 18 * pulse;
+        p.drawingContext.shadowColor = 'rgba(180,40,255,1)';
+        p.fill(180, 40, 255);
+        p.rect(this.x - 3, this.groundY - 8, 9, 14, 2);
+        p.rect(this.x + this.w - 6, this.groundY - 8, 9, 14, 2);
+        // Particules qui montent du trou
+        if (p.frameCount % 3 === 0) {
+          p.drawingContext.shadowBlur = 10;
+          p.fill(220, 100, 255, 150);
+          const px = this.x + 8 + Math.random() * (this.w - 16);
+          const py = this.groundY + Math.random() * 8;
+          p.circle(px, py, 2 + Math.random() * 2);
+        }
         break;
       }
     }

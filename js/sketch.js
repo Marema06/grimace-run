@@ -8,9 +8,11 @@ const PLAYER_X = 150;
 const AI_CFG = { size: 20, mutationRate: 0.06, mutationStrength: 0.22 };
 
 let player, obstacles, aiPop, face, audio, particles;
-let gameState  = 'PLAYING';
+let gameState  = 'INTRO'; // INTRO | PLAYING | GAMEOVER
 let highScore  = 0;
 let bgScroll   = 0;
+let _introTimer = 0;
+let _gameOverTimer = 0;
 
 // Etoiles fixes scintillantes
 let _stars = [];
@@ -103,9 +105,15 @@ function draw() {
     // Game over
     if (player.state === 'DEAD') {
       gameState = 'GAMEOVER';
+      _gameOverTimer = 0;
       highScore = Math.max(highScore, player.score);
       audio.death();
     }
+  } else if (gameState === 'INTRO') {
+    _introTimer++;
+    if (_introTimer > 180) gameState = 'PLAYING'; // 3 secondes
+  } else if (gameState === 'GAMEOVER') {
+    _gameOverTimer++;
   }
 
   // IA tourne toujours
@@ -128,6 +136,7 @@ function draw() {
   _drawWebcamPIP();
   _drawSpeedLines();
 
+  if (gameState === 'INTRO')    _drawIntroScreen();
   if (gameState === 'GAMEOVER') _drawGameOverScreen();
   _drawControls();
 
@@ -436,6 +445,90 @@ function _drawControls() {
   textAlign(LEFT);
 }
 
+// ─── Ecran d'INTRO animé (3 secondes) ────────────────────────────────────────
+function _drawIntroScreen() {
+  // Fond semi-transparent qui s'eclaircit
+  const fadeT = Math.min(_introTimer / 30, 1);
+  fill(0, 0, 0, 180 * fadeT); noStroke();
+  rect(0, 0, CANVAS_W, CANVAS_H);
+
+  textAlign(CENTER); textFont('monospace');
+
+  // Titre principal qui scale-in + glow pulsant
+  const tProgress = Math.min(_introTimer / 60, 1);
+  const easeT = 1 - Math.pow(1 - tProgress, 3); // ease-out cubic
+  const titleSize = 70 * easeT;
+  const pulse = 1 + Math.sin(_introTimer * 0.15) * 0.06;
+
+  if (_introTimer > 5) {
+    // GRIMACE en cyan
+    drawingContext.shadowBlur = 30 * pulse;
+    drawingContext.shadowColor = 'rgba(0,255,200,0.95)';
+    fill(0, 255, 200);
+    textSize(titleSize * pulse);
+    text('GRIMACE', CANVAS_W / 2 - 10, CANVAS_H / 2 - 30);
+
+    // RUN en rouge magenta
+    drawingContext.shadowColor = 'rgba(255,40,110,0.95)';
+    fill(255, 40, 110);
+    text('RUN', CANVAS_W / 2 + 145, CANVAS_H / 2 - 30);
+    drawingContext.shadowBlur = 0;
+  }
+
+  // Sous-titre qui apparait apres 1s
+  if (_introTimer > 60) {
+    const subT = Math.min((_introTimer - 60) / 30, 1);
+    fill(255, 210, 0, 255 * subT);
+    textSize(13);
+    drawingContext.shadowBlur = 8; drawingContext.shadowColor = 'rgba(255,210,0,0.7)';
+    text('NEURAL FACE RUNNER', CANVAS_W / 2, CANVAS_H / 2 + 20);
+    drawingContext.shadowBlur = 0;
+  }
+
+  // Instructions qui apparaissent apres 1.8s
+  if (_introTimer > 110) {
+    const insT = Math.min((_introTimer - 110) / 30, 1);
+    fill(180, 180, 220, 230 * insT);
+    textSize(10);
+    text('ML5 FACEMESH + NEURO-EVOLUTION', CANVAS_W / 2, CANVAS_H / 2 + 50);
+
+    fill(120, 200, 255, 180 * insT);
+    textSize(9);
+    text('Bouche -> SAUT  |  Sourcils -> DASH  |  Sourire -> BOUCLIER', CANVAS_W / 2, CANVAS_H / 2 + 75);
+    text('Clavier : ESPACE / FLECHE BAS / A', CANVAS_W / 2, CANVAS_H / 2 + 92);
+  }
+
+  // Compte a rebours dernier 1.5s
+  if (_introTimer > 90) {
+    const remaining = Math.ceil((180 - _introTimer) / 60);
+    if (remaining > 0) {
+      fill(255, 60, 110, 200);
+      textSize(20);
+      drawingContext.shadowBlur = 14;
+      drawingContext.shadowColor = 'rgba(255,60,110,0.9)';
+      text(`Demarrage dans ${remaining}...`, CANVAS_W / 2, CANVAS_H - 60);
+      drawingContext.shadowBlur = 0;
+    }
+  }
+
+  // Lignes decoratives synthwave
+  if (_introTimer > 5) {
+    stroke(0, 255, 200, 60); strokeWeight(1);
+    for (let i = 0; i < 3; i++) {
+      const ly = CANVAS_H / 2 - 80 + i * 4;
+      line(60, ly, CANVAS_W - 60, ly);
+    }
+    for (let i = 0; i < 3; i++) {
+      const ly = CANVAS_H / 2 + 110 + i * 4;
+      stroke(255, 40, 110, 60);
+      line(60, ly, CANVAS_W - 60, ly);
+    }
+    noStroke();
+  }
+
+  textAlign(LEFT);
+}
+
 // ─── Écran d'attente ─────────────────────────────────────────────────────────
 function _drawWaitScreen() {
   fill(0, 0, 0, 160); noStroke(); rect(0, 0, CANVAS_W, CANVAS_H);
@@ -457,24 +550,82 @@ function _drawWaitScreen() {
   textAlign(LEFT);
 }
 
-// ─── Écran Game Over ─────────────────────────────────────────────────────────
+// ─── Ecran GAME OVER avec glitch + animation score ───────────────────────────
 function _drawGameOverScreen() {
-  fill(0, 0, 0, 175); noStroke(); rect(0, 0, CANVAS_W, CANVAS_H);
-  textAlign(CENTER); textFont('monospace');
-  drawingContext.shadowBlur = 20; drawingContext.shadowColor = 'rgba(255,50,110,0.9)';
-  fill(255, 50, 110); textSize(42);
-  text('GAME OVER', CANVAS_W / 2, CANVAS_H / 2 - 50);
-  drawingContext.shadowBlur = 0;
+  // Fond rouge sombre qui pulse
+  const pulse = 0.5 + Math.sin(_gameOverTimer * 0.08) * 0.1;
+  fill(60 * pulse, 5, 15, 200); noStroke();
+  rect(0, 0, CANVAS_W, CANVAS_H);
 
-  fill(255, 210, 0); textSize(20);
-  text(`Score : ${Math.floor(player.score / 10)}`, CANVAS_W / 2, CANVAS_H / 2);
-  if (player.score >= highScore * 10 && highScore > 0) {
-    fill(0, 255, 200); textSize(14);
-    text('NOUVEAU RECORD !', CANVAS_W / 2, CANVAS_H / 2 + 26);
+  // Vignettage rouge sur les bords
+  for (let i = 0; i < 60; i += 4) {
+    fill(255, 20, 60, 4);
+    rect(i, i, CANVAS_W - i*2, CANVAS_H - i*2);
   }
 
-  fill(190, 190, 220); textSize(12);
-  text('ESPACE ou clic pour recommencer', CANVAS_W / 2, CANVAS_H / 2 + 55);
+  textAlign(CENTER); textFont('monospace');
+
+  // Glitch effect sur GAME OVER
+  const glitchX = (Math.random() - 0.5) * 4;
+  const glitchY = (Math.random() - 0.5) * 2;
+
+  // Ombre rouge + cyan (effet RGB split)
+  drawingContext.shadowBlur = 0;
+  fill(0, 255, 200, 120); textSize(56);
+  text('GAME OVER', CANVAS_W / 2 - 3, CANVAS_H / 2 - 70);
+  fill(255, 40, 80, 120);
+  text('GAME OVER', CANVAS_W / 2 + 3, CANVAS_H / 2 - 70);
+
+  // Texte principal
+  drawingContext.shadowBlur = 28;
+  drawingContext.shadowColor = 'rgba(255,40,80,1)';
+  fill(255, 60, 110);
+  text('GAME OVER', CANVAS_W / 2 + glitchX, CANVAS_H / 2 - 70 + glitchY);
+  drawingContext.shadowBlur = 0;
+
+  // Score qui s'anime (count up)
+  const finalScore = Math.floor(player.score / 10);
+  const scoreReveal = Math.min(_gameOverTimer / 60, 1);
+  const displayScore = Math.floor(finalScore * scoreReveal);
+
+  fill(255, 210, 0);
+  drawingContext.shadowBlur = 12; drawingContext.shadowColor = 'rgba(255,210,0,0.8)';
+  textSize(22);
+  text(`SCORE : ${displayScore}`, CANVAS_W / 2, CANVAS_H / 2 - 10);
+  drawingContext.shadowBlur = 0;
+
+  // Record
+  fill(180, 180, 220); textSize(12);
+  text(`Record : ${Math.floor(highScore / 10)}`, CANVAS_W / 2, CANVAS_H / 2 + 18);
+
+  if (player.score >= highScore && highScore > 0 && _gameOverTimer > 60) {
+    const recordPulse = 1 + Math.sin(_gameOverTimer * 0.2) * 0.15;
+    fill(0, 255, 200);
+    drawingContext.shadowBlur = 16;
+    drawingContext.shadowColor = 'rgba(0,255,200,1)';
+    textSize(16 * recordPulse);
+    text('★ NOUVEAU RECORD ★', CANVAS_W / 2, CANVAS_H / 2 + 50);
+    drawingContext.shadowBlur = 0;
+  }
+
+  // Generation IA atteinte
+  if (_gameOverTimer > 90) {
+    fill(140, 200, 255, 200);
+    textSize(11);
+    text(`IA Generation ${aiPop.generation}  |  Meilleur IA : ${Math.floor(aiPop.bestFit / 10)}`,
+         CANVAS_W / 2, CANVAS_H / 2 + 80);
+  }
+
+  // Prompt clignotant
+  if (_gameOverTimer > 120) {
+    const blink = Math.floor(_gameOverTimer / 30) % 2 === 0;
+    if (blink) {
+      fill(255, 255, 255);
+      textSize(13);
+      text('ESPACE ou CLIC pour rejouer', CANVAS_W / 2, CANVAS_H / 2 + 115);
+    }
+  }
+
   textAlign(LEFT);
 }
 
