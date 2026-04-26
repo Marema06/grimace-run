@@ -52,6 +52,23 @@ class NeuralNet {
     return current;
   }
 
+  // Predict en gardant TOUTES les activations couche par couche (pour le visualiseur)
+  predictWithActivations(inputs) {
+    const activations = [[...inputs]];
+    let current = [...inputs];
+    for (const { weights, biases } of this.layers) {
+      const next = [];
+      for (let j = 0; j < biases.length; j++) {
+        let sum = biases[j];
+        for (let i = 0; i < current.length; i++) sum += current[i] * weights[i][j];
+        next.push(this._activate(sum));
+      }
+      activations.push([...next]);
+      current = next;
+    }
+    return { outputs: current, activations };
+  }
+
   copy() {
     const c = new NeuralNet(this.inputSize, this.hiddenSizes, this.outputSize, this.activation);
     c.layers = this.layers.map(({ weights, biases }) => ({

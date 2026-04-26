@@ -169,6 +169,8 @@ function draw() {
   _drawWebcamPIP();
   _drawSpeedLines();
   _drawMoodRing();
+  _drawBrainViz();
+  _drawFitnessGraph();
   _drawAnnouncements();
 
   if (gameState === 'INTRO')    _drawIntroScreen();
@@ -363,6 +365,179 @@ function _drawHUD() {
   textAlign(RIGHT);
   text(`VITESSE ${obstacles.speed.toFixed(1)}`, CANVAS_W - 10, 27);
   textAlign(LEFT);
+}
+
+// ─── VISUALISEUR DU CERVEAU IA EN TEMPS REEL ─────────────────────────────────
+// Le coeur creatif du projet : on VOIT le reseau de neurones decider en direct
+function _drawBrainViz() {
+  const best = aiPop.getBestAlive();
+  if (!best || !best.lastActivations) return;
+
+  const acts = best.lastActivations; // [inputs(6), hidden(8), outputs(2)]
+  const brain = best.brain;
+  if (!brain || !brain.layers) return;
+
+  // Position : coin bas-droit, sous la PIP webcam
+  const X = CANVAS_W - 280, Y = 200, W = 270, H = 175;
+
+  // Fond
+  noStroke(); fill(0, 0, 0, 200);
+  rect(X, Y, W, H, 6);
+  stroke(0, 255, 200, 80); strokeWeight(1); noFill();
+  rect(X, Y, W, H, 6);
+  noStroke();
+
+  // Titre
+  fill(0, 255, 200);
+  textFont('monospace'); textSize(9); textAlign(LEFT);
+  drawingContext.shadowBlur = 6; drawingContext.shadowColor = 'rgba(0,255,200,0.8)';
+  text('CERVEAU IA - LIVE', X + 8, Y + 12);
+  drawingContext.shadowBlur = 0;
+  fill(140, 200, 255); textSize(7);
+  text(`Fitness ${best.fitness}  |  6 -> 8 -> 2`, X + 8, Y + 22);
+
+  // Positions des couches
+  const layerXs = [X + 30, X + W/2, X + W - 30];
+  const labels = {
+    inputs:  ['dist1', 'type1', 'haut1', 'dist2', 'hauteur', 'vitesse'],
+    outputs: ['SAUT', 'DASH'],
+  };
+
+  // Calcul positions des neurones
+  const neuronPos = acts.map((layer, li) => {
+    return layer.map((_, ni) => {
+      const layerY = Y + 35 + (H - 50) * (ni + 1) / (layer.length + 1);
+      return { x: layerXs[li], y: layerY };
+    });
+  });
+
+  // Connexions (lignes) - epaisseur = |poids|, couleur = signe
+  for (let l = 0; l < brain.layers.length; l++) {
+    const { weights } = brain.layers[l];
+    const fromActs = acts[l];
+    for (let i = 0; i < weights.length; i++) {
+      for (let j = 0; j < weights[i].length; j++) {
+        const w = weights[i][j];
+        const absW = Math.min(Math.abs(w), 2);
+        const flow = fromActs[i] * w; // intensite reelle
+        const alpha = 30 + Math.min(Math.abs(flow) * 120, 180);
+        if (w > 0) stroke(0, 255, 200, alpha);
+        else       stroke(255, 60, 110, alpha);
+        strokeWeight(0.3 + absW * 1.2);
+        line(neuronPos[l][i].x, neuronPos[l][i].y,
+             neuronPos[l+1][j].x, neuronPos[l+1][j].y);
+      }
+    }
+  }
+  noStroke();
+
+  // Neurones (cercles colores selon activation)
+  for (let li = 0; li < acts.length; li++) {
+    const layer = acts[li];
+    for (let ni = 0; ni < layer.length; ni++) {
+      const a = layer[ni];
+      const pos = neuronPos[li][ni];
+      const intensity = Math.min(Math.abs(a), 1);
+      // Couleur selon activation (positif=cyan, negatif=magenta)
+      const r = a > 0 ? 0   : 255;
+      const g = a > 0 ? 255 : 60;
+      const b = a > 0 ? 200 : 110;
+      drawingContext.shadowBlur = 6 * intensity;
+      drawingContext.shadowColor = `rgb(${r},${g},${b})`;
+      // Coeur
+      fill(r, g, b, 100 + intensity * 155);
+      circle(pos.x, pos.y, 8 + intensity * 4);
+      // Bordure
+      stroke(r, g, b);
+      strokeWeight(1);
+      noFill();
+      circle(pos.x, pos.y, 9);
+      noStroke();
+      drawingContext.shadowBlur = 0;
+    }
+  }
+
+  // Labels entrees
+  fill(140, 180, 255); textSize(6.5); textAlign(RIGHT);
+  for (let i = 0; i < 6; i++) {
+    text(labels.inputs[i], neuronPos[0][i].x - 7, neuronPos[0][i].y + 2);
+  }
+  // Labels sorties
+  textAlign(LEFT);
+  for (let i = 0; i < 2; i++) {
+    const fired = acts[acts.length-1][i] > 0.45;
+    fill(fired ? color(255, 60, 110) : color(140, 180, 255));
+    textSize(fired ? 9 : 7);
+    drawingContext.shadowBlur = fired ? 8 : 0;
+    drawingContext.shadowColor = 'rgba(255,60,110,0.9)';
+    text(labels.outputs[i] + (fired ? ' !' : ''), neuronPos[2][i].x + 7, neuronPos[2][i].y + 2);
+    drawingContext.shadowBlur = 0;
+  }
+}
+
+// ─── GRAPHIQUE D'APPRENTISSAGE : fitness sur les N dernieres generations ─────
+function _drawFitnessGraph() {
+  if (!aiPop.history?.length) return;
+
+  const X = 8, Y = CANVAS_H - 130, W = 250, H = 75;
+
+  noStroke(); fill(0, 0, 0, 180);
+  rect(X, Y, W, H, 5);
+  stroke(0, 255, 200, 60); noFill();
+  rect(X, Y, W, H, 5);
+  noStroke();
+
+  // Titre
+  fill(0, 255, 200);
+  textFont('monospace'); textSize(8); textAlign(LEFT);
+  text('FITNESS - APPRENTISSAGE IA', X + 6, Y + 11);
+
+  const hist = aiPop.history;
+  const maxFit = Math.max(...hist.map(h => h.best), 50);
+  const padX = 8, padY = 18, gW = W - padX * 2, gH = H - padY - 10;
+
+  // Grille horizontale
+  stroke(0, 255, 200, 25); strokeWeight(1);
+  for (let i = 0; i <= 3; i++) {
+    const gy = Y + padY + (gH * i / 3);
+    line(X + padX, gy, X + W - padX, gy);
+  }
+  noStroke();
+
+  // Ligne de l'evolution (best)
+  stroke(0, 255, 200); strokeWeight(2);
+  drawingContext.shadowBlur = 6; drawingContext.shadowColor = 'rgba(0,255,200,0.7)';
+  noFill();
+  beginShape();
+  for (let i = 0; i < hist.length; i++) {
+    const x = X + padX + (gW * i / Math.max(hist.length - 1, 1));
+    const y = Y + padY + gH - (hist[i].best / maxFit) * gH;
+    vertex(x, y);
+  }
+  endShape();
+  drawingContext.shadowBlur = 0;
+
+  // Ligne de la moyenne
+  stroke(255, 220, 0, 180); strokeWeight(1.2);
+  beginShape();
+  for (let i = 0; i < hist.length; i++) {
+    const x = X + padX + (gW * i / Math.max(hist.length - 1, 1));
+    const y = Y + padY + gH - (hist[i].avg / maxFit) * gH;
+    vertex(x, y);
+  }
+  endShape();
+  noStroke();
+
+  // Legende
+  textSize(7); textAlign(LEFT);
+  fill(0, 255, 200); text('— meilleur', X + W - 90, Y + 11);
+  fill(255, 220, 0); text('— moyenne', X + W - 90, Y + 21);
+
+  // Stats actuelles
+  fill(160, 200, 255); textSize(8);
+  const last = hist[hist.length - 1];
+  text(`Gen ${aiPop.generation}  |  Best ${aiPop.allTimeBest}  |  Pop ${AI_CFG.size}`,
+       X + 6, Y + H - 4);
 }
 
 // ─── Mood Ring : les bords du jeu reagissent a ton emotion faciale ──────────
@@ -740,6 +915,30 @@ function _setupUI() {
   document.getElementById('btn-reset-ai')?.addEventListener('click', (e) => {
     aiPop.reset(); _updateAIStats();
     e.currentTarget.blur();
+  });
+
+  // Export du meilleur cerveau en JSON (preuve d'engineering)
+  document.getElementById('btn-export-brain')?.addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    const brain = aiPop.bestBrain || aiPop.runners[0]?.brain;
+    if (!brain) { alert('Aucun cerveau a exporter encore'); return; }
+    const data = {
+      meta: {
+        project:    'GRIMACE RUN',
+        generation: aiPop.generation,
+        fitness:    aiPop.allTimeBest,
+        date:       new Date().toISOString(),
+      },
+      brain: brain.toJSON(),
+      historique: aiPop.history,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `grimace-brain-gen${aiPop.generation}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   });
 }
 

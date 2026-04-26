@@ -53,7 +53,14 @@ class AIRunner {
       Math.max(-1, Math.min(1, this.vy / 15)),
     ];
 
-    const [jumpOut, dashOut] = this.brain.predict(inputs);
+    // On garde inputs et activations pour le visualiseur
+    this.lastInputs = inputs;
+    const result = this.brain.predictWithActivations
+      ? this.brain.predictWithActivations(inputs)
+      : { outputs: this.brain.predict(inputs), activations: [inputs] };
+    this.lastActivations = result.activations;
+    const [jumpOut, dashOut] = result.outputs;
+    this.lastOutputs = [jumpOut, dashOut];
 
     // ── Actions ──────────────────────────────────────────────────────────────
     if (this._jumpCD > 0) this._jumpCD--;
@@ -118,7 +125,18 @@ class AIPopulation {
     this.bestFit    = 0;
     this.bestBrain  = null;
     this.allTimeBest = 0;
+    // Historique pour le graphique d'apprentissage
+    this.history = []; // { gen, best, avg, max }
     this._spawn(false);
+  }
+
+  // Recupere le runner vivant le plus performant (pour visualiser son cerveau)
+  getBestAlive() {
+    let best = null;
+    for (const r of this.runners) {
+      if (r.alive && (!best || r.fitness > best.fitness)) best = r;
+    }
+    return best;
   }
 
   _spawn(evolve) {
@@ -132,6 +150,18 @@ class AIPopulation {
         this.bestBrain = best.brain.copy();
       }
       this.allTimeBest = Math.max(this.allTimeBest, best.fitness);
+
+      // Sauvegarde des stats de cette generation pour le graphique
+      const fits = this.runners.map(r => r.fitness);
+      const avg  = fits.reduce((a, b) => a + b, 0) / fits.length;
+      this.history.push({
+        gen:  this.generation,
+        best: best.fitness,
+        avg:  Math.floor(avg),
+        max:  this.allTimeBest,
+      });
+      // On garde les 60 dernieres generations
+      if (this.history.length > 60) this.history.shift();
     }
 
     this.runners = [];
