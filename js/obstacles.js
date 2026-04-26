@@ -143,6 +143,67 @@ class Obstacle {
   }
 }
 
+// ─── ORBES ENERGETIQUES A COLLECTER (gameplay actif !) ────────────────────────
+class Orb {
+  constructor(x, y, type = 'normal') {
+    this.x = x; this.y = y;
+    this.type = type; // 'normal' (cyan, +10) | 'gold' (or, +50 + boost) | 'rage' (rouge, +rage)
+    this.r = type === 'gold' ? 11 : 8;
+    this.alive = true;
+    this.collected = false;
+    this.spin = Math.random() * Math.PI * 2;
+    this.bobOffset = Math.random() * Math.PI * 2;
+  }
+  update(speed) {
+    this.x -= speed;
+    this.spin += 0.08;
+    if (this.x < -30) this.alive = false;
+  }
+  collides(player) {
+    const dx = this.x - player.x;
+    const dy = (this.y) - (player.y - 24);
+    return (dx*dx + dy*dy) < (this.r + 18) * (this.r + 18);
+  }
+  draw(p) {
+    if (!this.alive || this.collected) return;
+    const bob = Math.sin(p.frameCount * 0.1 + this.bobOffset) * 4;
+    const cy  = this.y + bob;
+
+    let col;
+    if (this.type === 'gold')      col = [255, 220, 0];
+    else if (this.type === 'rage') col = [255, 50, 100];
+    else                           col = [0, 230, 255];
+
+    // Halo exterieur
+    p.drawingContext.shadowBlur = 22;
+    p.drawingContext.shadowColor = `rgba(${col.join(',')},0.95)`;
+    p.noStroke();
+    p.fill(col[0], col[1], col[2], 60);
+    p.circle(this.x, cy, this.r * 3);
+
+    // Corps qui tourne (effet diamant)
+    p.push();
+    p.translate(this.x, cy);
+    p.rotate(this.spin);
+    p.fill(col[0], col[1], col[2]);
+    p.beginShape();
+    p.vertex(0, -this.r);
+    p.vertex(this.r * 0.8, 0);
+    p.vertex(0, this.r);
+    p.vertex(-this.r * 0.8, 0);
+    p.endShape(p.CLOSE);
+    // Reflet brillant
+    p.fill(255, 255, 255, 200);
+    p.beginShape();
+    p.vertex(0, -this.r * 0.9);
+    p.vertex(this.r * 0.4, -this.r * 0.3);
+    p.vertex(-this.r * 0.3, -this.r * 0.3);
+    p.endShape(p.CLOSE);
+    p.pop();
+    p.drawingContext.shadowBlur = 0;
+  }
+}
+
 // ─── Gestionnaire d'obstacles ─────────────────────────────────────────────────
 class ObstacleManager {
   constructor(groundY, canvasH, canvasW) {
@@ -150,9 +211,11 @@ class ObstacleManager {
     this.canvasH   = canvasH;
     this.canvasW   = canvasW;
     this.obstacles = [];
+    this.orbs      = []; // orbes a collecter
     this.speed     = 4.2;
-    this.spawnIn   = 90;   // frames avant prochain spawn
-    this.timer     = 60;   // délai initial
+    this.spawnIn   = 90;
+    this.timer     = 60;
+    this.orbTimer  = 50;
     this.frame     = 0;
   }
 
@@ -165,14 +228,51 @@ class ObstacleManager {
       this.spawnIn = Math.max(55, this.spawnIn - 4);
     }
 
-    // Spawn
+    // Spawn obstacles
     if (--this.timer <= 0) {
       this._spawn();
       this.timer = this.spawnIn + Math.floor(Math.random() * 30);
     }
 
+    // Spawn orbes a collecter
+    if (--this.orbTimer <= 0) {
+      this._spawnOrb();
+      this.orbTimer = 60 + Math.floor(Math.random() * 50);
+    }
+
     for (const o of this.obstacles) o.update();
     this.obstacles = this.obstacles.filter(o => o.alive);
+    for (const o of this.orbs) o.update(this.speed);
+    this.orbs = this.orbs.filter(o => o.alive && !o.collected);
+  }
+
+  _spawnOrb() {
+    // Type rare : 8% gold, 12% rage, 80% normal
+    const rng = Math.random();
+    let type = 'normal';
+    if (rng < 0.08) type = 'gold';
+    else if (rng < 0.20) type = 'rage';
+
+    // Position : au sol, en l'air, ou tres haut (incite au super saut)
+    const heights = [
+      this.groundY - 30,   // bas (en courant)
+      this.groundY - 90,   // moyen (saut normal)
+      this.groundY - 150,  // haut (super saut)
+    ];
+    const y = heights[Math.floor(Math.random() * heights.length)];
+    this.orbs.push(new Orb(this.canvasW + 30, y, type));
+  }
+
+  // Verifie collecte par le joueur
+  checkOrbCollection(player) {
+    const collected = [];
+    for (const orb of this.orbs) {
+      if (!orb.collected && orb.collides(player)) {
+        orb.collected = true;
+        collected.push(orb);
+      }
+    }
+    return collected;
   }
 
   _spawn() {
@@ -195,16 +295,19 @@ class ObstacleManager {
   }
 
   draw(p) {
-    // Dessiner les trous en premier (fond), puis les obstacles sur le dessus
     for (const o of this.obstacles) if (o.type === OBS.PIT) o.draw(p);
     for (const o of this.obstacles) if (o.type !== OBS.PIT) o.draw(p);
+    // Orbes au-dessus
+    for (const o of this.orbs) o.draw(p);
   }
 
   reset() {
     this.obstacles = [];
+    this.orbs      = [];
     this.speed     = 4.2;
     this.spawnIn   = 90;
     this.timer     = 80;
+    this.orbTimer  = 50;
     this.frame     = 0;
   }
 }

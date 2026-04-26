@@ -15,7 +15,7 @@ class Player {
     this.W = 26;
     this.H = 46;
 
-    this.state           = 'RUNNING'; // RUNNING | JUMPING | DASHING | DEAD
+    this.state           = 'RUNNING';
     this.shielded        = false;
     this.shieldTimer     = 0;
     this.dashTimer       = 0;
@@ -23,6 +23,14 @@ class Player {
     this.invincibleTimer = 0;
     this.lives           = 3;
     this.score           = 0;
+
+    // Multiplicateur + RAGE
+    this.multiplier      = 1;
+    this.multiTimer      = 0;
+    this.rage            = 0;     // 0 a 100
+    this.rageMode        = false;
+    this.rageTimer       = 0;
+    this.orbsCollected   = 0;
 
     // Animation jambes
     this.legPhase = 0;
@@ -67,10 +75,37 @@ class Player {
 
   hit() {
     if (this.shielded || this.invincibleTimer > 0 || this.state === 'DEAD') return false;
+    if (this.rageMode) return false; // Invincible en RAGE
     this.lives--;
     this.invincibleTimer = 80;
+    this.multiplier = 1; // perd le combo en se prenant un coup
+    this.multiTimer = 0;
     if (this.lives <= 0) this.state = 'DEAD';
     return true;
+  }
+
+  collectOrb(orb) {
+    this.orbsCollected++;
+    this.multiTimer = 180; // 3s pour garder le combo
+    this.multiplier = Math.min(this.multiplier + 1, 8);
+
+    if (orb.type === 'gold') {
+      this.score += 50 * this.multiplier;
+      return { points: 50 * this.multiplier, type: 'gold' };
+    } else if (orb.type === 'rage') {
+      this.rage = Math.min(this.rage + 30, 100);
+      this.score += 15 * this.multiplier;
+      if (this.rage >= 100 && !this.rageMode) {
+        this.rageMode  = true;
+        this.rageTimer = 300; // 5 secondes
+        this.rage      = 0;
+      }
+      return { points: 15 * this.multiplier, type: 'rage' };
+    } else {
+      this.score += 10 * this.multiplier;
+      this.rage = Math.min(this.rage + 5, 100);
+      return { points: 10 * this.multiplier, type: 'normal' };
+    }
   }
 
   update() {
@@ -80,6 +115,18 @@ class Player {
     if (this.shieldTimer  > 0) { this.shieldTimer--;  if (!this.shieldTimer) this.shielded = false; }
     if (this.dashTimer    > 0) { this.dashTimer--;     if (!this.dashTimer && this.y >= this.groundY - 2) this.state = 'RUNNING'; }
     if (this.invincibleTimer > 0) this.invincibleTimer--;
+
+    // Multiplicateur (perd si pas d'orbe pendant 3s)
+    if (this.multiTimer > 0) {
+      this.multiTimer--;
+      if (this.multiTimer === 0) this.multiplier = 1;
+    }
+
+    // Mode RAGE (invincible + glow rouge)
+    if (this.rageMode) {
+      this.rageTimer--;
+      if (this.rageTimer <= 0) this.rageMode = false;
+    }
 
     // Physique
     this.vy += this.dashTimer > 0 ? this.GRAVITY * 0.25 : this.GRAVITY;
@@ -117,11 +164,31 @@ class Player {
     // Aura neon autour du joueur (pulsation)
     const pulse = 1 + Math.sin(p.frameCount * 0.15) * 0.15;
     p.noStroke();
-    p.drawingContext.shadowBlur = 25 * pulse;
-    p.drawingContext.shadowColor = dashing ? 'rgba(255,140,0,0.7)' : 'rgba(0,220,255,0.7)';
-    p.fill(dashing ? p.color(255,140,0,30) : p.color(0,220,255,30));
-    p.ellipse(this.x, this.y - bodyH/2, this.W * 2.4 * pulse, bodyH * 1.8 * pulse);
-    p.drawingContext.shadowBlur = 0;
+
+    // En mode RAGE : aura rouge enorme + flammes
+    if (this.rageMode) {
+      const ragePulse = 1 + Math.abs(Math.sin(p.frameCount * 0.3)) * 0.4;
+      p.drawingContext.shadowBlur = 40 * ragePulse;
+      p.drawingContext.shadowColor = 'rgba(255,30,60,1)';
+      p.fill(255, 50, 80, 50);
+      p.ellipse(this.x, this.y - bodyH/2, this.W * 3.2 * ragePulse, bodyH * 2.5 * ragePulse);
+      // Flammes au sol
+      p.drawingContext.shadowBlur = 18;
+      p.drawingContext.shadowColor = 'rgba(255,140,0,1)';
+      for (let i = 0; i < 4; i++) {
+        const fx = this.x + (Math.random() - 0.5) * 30;
+        const fy = this.y - Math.random() * 8;
+        p.fill(255, 100 + Math.random() * 100, 0, 200);
+        p.circle(fx, fy, 6 + Math.random() * 8);
+      }
+      p.drawingContext.shadowBlur = 0;
+    } else {
+      p.drawingContext.shadowBlur = 25 * pulse;
+      p.drawingContext.shadowColor = dashing ? 'rgba(255,140,0,0.7)' : 'rgba(0,220,255,0.7)';
+      p.fill(dashing ? p.color(255,140,0,30) : p.color(0,220,255,30));
+      p.ellipse(this.x, this.y - bodyH/2, this.W * 2.4 * pulse, bodyH * 1.8 * pulse);
+      p.drawingContext.shadowBlur = 0;
+    }
 
     // Trail dash (traînée bleue)
     for (let i = 0; i < this.trail.length; i++) {

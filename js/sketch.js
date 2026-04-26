@@ -159,6 +159,28 @@ function draw() {
       }
     }
 
+    // ── Collecte des orbes ! ─────────────────────────────────────────────────
+    const collected = obstacles.checkOrbCollection(player);
+    for (const orb of collected) {
+      const result = player.collectOrb(orb);
+      audio.jump(); // son leger
+      const col = orb.type === 'gold' ? [255,220,0]
+                : orb.type === 'rage' ? [255,60,100]
+                : [0,230,255];
+      _scorePopups.push({
+        text: `+${result.points}${player.multiplier > 1 ? ' x'+player.multiplier : ''}`,
+        x: orb.x, y: orb.y,
+        vy: 1.8, life: 60, scale: 0.6, col,
+      });
+      _spawnSparkles(orb.x, orb.y, 12, col);
+      if (orb.type === 'gold') _spawnConfetti(orb.x, orb.y, 15, [[255,220,0]]);
+      if (player.rageMode && player.rageTimer === 300) {
+        _announce('RAGE MODE !!!', [255,60,100]);
+        _shake(8, 20);
+        _spawnConfetti(player.x, player.y - 25, 50, [[255,30,80],[255,80,0]]);
+      }
+    }
+
     // Coeurs qui montent quand bouclier actif
     if (player.shielded && frameCount % 6 === 0) {
       _hearts.push({
@@ -539,6 +561,51 @@ function _drawHUD() {
   textAlign(RIGHT);
   text(`VITESSE ${obstacles.speed.toFixed(1)}`, CANVAS_W - 10, 27);
   textAlign(LEFT);
+
+  // ── GROS MULTIPLICATEUR au centre-haut quand actif ──────────────────────────
+  if (player.multiplier > 1) {
+    const mPulse = 1 + Math.sin(frameCount * 0.2) * 0.1;
+    const mAlpha = Math.min(player.multiTimer / 60, 1) * 255;
+    drawingContext.shadowBlur = 14;
+    drawingContext.shadowColor = 'rgba(255,220,0,1)';
+    fill(255, 220, 0, mAlpha);
+    textSize(38 * mPulse); textAlign(CENTER); textFont('monospace');
+    text(`x${player.multiplier}`, CANVAS_W / 2, 50);
+    drawingContext.shadowBlur = 0;
+    // Petite jauge de timer
+    fill(255, 220, 0, 200 * (mAlpha/255));
+    rect(CANVAS_W / 2 - 30, 58, 60 * (player.multiTimer / 180), 3);
+    textAlign(LEFT);
+  }
+
+  // ── JAUGE DE RAGE en bas-centre ─────────────────────────────────────────────
+  if (gameState === 'PLAYING') {
+    const gx = CANVAS_W / 2 - 90, gy = CANVAS_H - 28, gw = 180, gh = 14;
+    fill(0, 0, 0, 160); noStroke(); rect(gx, gy, gw, gh, 3);
+    // Fill
+    if (player.rageMode) {
+      // Mode RAGE actif : barre rouge clignotante
+      const rPulse = Math.abs(Math.sin(frameCount * 0.3));
+      fill(255, 30 + rPulse * 80, 60 + rPulse * 40);
+      drawingContext.shadowBlur = 14; drawingContext.shadowColor = 'rgba(255,30,60,1)';
+      const rageW = (player.rageTimer / 300) * gw;
+      rect(gx, gy, rageW, gh, 3);
+      drawingContext.shadowBlur = 0;
+      fill(255); textSize(9); textAlign(CENTER);
+      text(`RAGE MODE : ${(player.rageTimer / 60).toFixed(1)}s`, CANVAS_W / 2, gy + 10);
+      textAlign(LEFT);
+    } else {
+      // Charge en cours
+      const fillPct = player.rage / 100;
+      fill(255, 60, 100, 200);
+      drawingContext.shadowBlur = 8; drawingContext.shadowColor = 'rgba(255,60,100,0.8)';
+      rect(gx, gy, gw * fillPct, gh, 3);
+      drawingContext.shadowBlur = 0;
+      fill(255, 200, 220); textSize(8); textAlign(CENTER);
+      text(`RAGE ${Math.floor(player.rage)}/100`, CANVAS_W / 2, gy + 10);
+      textAlign(LEFT);
+    }
+  }
 }
 
 // ─── VISUALISEUR DU CERVEAU IA EN TEMPS REEL ─────────────────────────────────
