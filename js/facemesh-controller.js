@@ -30,11 +30,42 @@ class FaceMeshController {
     this.statusEl   = document.getElementById('face-status');
     this.btn        = document.getElementById('btn-facemesh');
 
+    // Boost de luminosite ajustable (correction gamma)
+    // Gamma < 1 = images plus claires (parfait peau foncee / faible lumiere)
+    this.gamma = 0.45;          // ajustable via slider
+    this.brightness = 2.0;      // multiplicateur CSS
+    this.contrast   = 1.4;
+    this._gammaLUT = this._buildGammaLUT(this.gamma);
+    this._noFaceFrames = 0; // adaptatif
+
+    this._setupBrightnessSlider();
+
     // Le bouton ACTIVE seulement, jamais ne desactive
     this.btn?.addEventListener('click', () => this._activate());
   }
 
   // _activate est IDEMPOTENT : ne fait rien si deja actif ou en cours d'activation
+  // Lookup table pour la correction gamma (rapide, evite Math.pow par pixel)
+  _buildGammaLUT(gamma) {
+    const lut = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) {
+      lut[i] = Math.min(255, Math.floor(255 * Math.pow(i / 255, gamma)));
+    }
+    return lut;
+  }
+
+  _setupBrightnessSlider() {
+    const slider = document.getElementById('brightness-slider');
+    const label  = document.getElementById('brightness-value');
+    if (!slider) return;
+    slider.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      this.gamma = v;
+      this._gammaLUT = this._buildGammaLUT(v);
+      if (label) label.textContent = v.toFixed(2);
+    });
+  }
+
   async _activate() {
     if (this.active || this._activating) return;
     this._activating = true;
@@ -68,9 +99,25 @@ class FaceMeshController {
 
       const renderProc = () => {
         if (!this.active && !this._activating) return;
-        // Boost lumiere : x1.6 + contraste +25%
-        this.procCtx.filter = 'brightness(1.6) contrast(1.25)';
-        try { this.procCtx.drawImage(this.videoEl, 0, 0, W, H); } catch(_) {}
+
+        // 1. Filtre CSS : boost luminosite + contraste
+        this.procCtx.filter = `brightness(${this.brightness}) contrast(${this.contrast})`;
+        try { this.procCtx.drawImage(this.videoEl, 0, 0, W, H); } catch(_) { requestAnimationFrame(renderProc); return; }
+
+        // 2. Correction gamma au niveau pixel (eclaircit les midtones)
+        // Tres efficace pour peau foncee / sous-exposition
+        try {
+          const imgData = this.procCtx.getImageData(0, 0, W, H);
+          const d = imgData.data;
+          const lut = this._gammaLUT;
+          for (let i = 0; i < d.length; i += 4) {
+            d[i]   = lut[d[i]];
+            d[i+1] = lut[d[i+1]];
+            d[i+2] = lut[d[i+2]];
+          }
+          this.procCtx.putImageData(imgData, 0, 0);
+        } catch(_) {}
+
         requestAnimationFrame(renderProc);
       };
       requestAnimationFrame(renderProc);
@@ -119,8 +166,20 @@ class FaceMeshController {
     if (!this.faces?.length) {
       this.mouthOpen = this.mouthWide = this.eyebrowRaised = this.smiling = false;
       this.mouthRatio = this.browRatio = this.smileRatio = 0;
+      // Auto-ajustement : si pas de visage detecte longtemps, on eclaircit l'image
+      this._noFaceFrames++;
+      if (this._noFaceFrames > 90 && this.gamma > 0.25) {
+        this.gamma = Math.max(0.25, this.gamma - 0.05);
+        this._gammaLUT = this._buildGammaLUT(this.gamma);
+        const slider = document.getElementById('brightness-slider');
+        const label  = document.getElementById('brightness-value');
+        if (slider) slider.value = this.gamma;
+        if (label)  label.textContent = this.gamma.toFixed(2);
+        this._noFaceFrames = 0;
+      }
       return;
     }
+    this._noFaceFrames = 0; // reset, visage trouve
 
     const kps = this.faces[0].keypoints;
     if (!kps || kps.length < 400) return;

@@ -109,3 +109,24 @@ button {
 }
 
 #face-status { font-size: 9px; color: var(--dim); text-align: center; min-height: 13px; }
+
+.bright-ctrl {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 8px; color: var(--dim); padding: 2px 4px;
+}
+.bright-lbl { letter-spacing: 1px; }
+#brightness-slider {
+  flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+  background: linear-gradient(to right, #1e1e3a, #00ffcc); border-radius: 2px; outline: none;
+}
+#brightness-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--cyan); cursor: pointer;
+  box-shadow: 0 0 6px rgba(0,255,200,0.8);
+}
+#brightness-slider::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--cyan); border: none; cursor: pointer;
+}
+#brightness-value { color: var(--cyan); min-width: 26px; text-align: right; }

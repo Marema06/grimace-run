@@ -62,6 +62,14 @@
     </div>
 
     <button id="btn-facemesh" class="btn-primary" tabindex="-1">ACTIVER VISAGE</button>
+
+    <!-- Slider luminosite pour la detection -->
+    <div class="bright-ctrl">
+      <span class="bright-lbl">Luminosité détection</span>
+      <input id="brightness-slider" type="range" min="0.25" max="1.0" step="0.05" value="0.45" tabindex="-1">
+      <span id="brightness-value">0.45</span>
+    </div>
+
     <div id="face-status">Webcam désactivée</div>
     <div id="webcam-wrapper">
       <video id="webcam" autoplay muted playsinline></video>
