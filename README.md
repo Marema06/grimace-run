@@ -121,7 +121,7 @@ Ouvrir **http://localhost:3001** dans Chrome (nécessaire pour l'accès webcam).
 
 ## Problèmes rencontrés et solutions
 
-Cette section documente les difficultés techniques rencontrées pendant le développement et les solutions apportées. C'est l'aspect le plus instructif du projet.
+Cette section documente les difficultés techniques rencontrées pendant le développement et les solutions apportées.
 
 ### 1. Biais de MediaPipe FaceMesh sur les peaux foncées
 
@@ -205,5 +205,3 @@ Convergence visible en 5 à 15 générations selon les conditions.
 - Pas de persistance du meilleur cerveau entre sessions (export JSON manuel disponible)
 
 ---
-
-*Projet réalisé dans le cadre du cours IA2 - MIAGE 2025-2026*
